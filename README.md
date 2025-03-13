@@ -3,6 +3,8 @@
 
 The value of each color is represented by a 15bit RGB value
 
+"commit" will make the pallette change immediate. If used during a fade-in, uncheck it.
+
 ![image](https://github.com/user-attachments/assets/83791fcc-9e21-405f-a8fa-e40c9acb1203)
 
 ![image](https://github.com/user-attachments/assets/c9c642bf-7375-45bc-8fb7-da3728da5ef6)
