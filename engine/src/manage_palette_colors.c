@@ -69,3 +69,40 @@ void set_palette_colors(SCRIPT_CTX * THIS) OLDCALL BANKED {
 #endif
 	}
 }
+
+inline void load_bkg_palette(const palette_t * palette, UBYTE bank) {
+	palette_entry_t * dest = BkgPalette;
+	UBYTE mask = ReadBankedUBYTE(&palette->mask, bank);
+    palette_entry_t * sour = palette->cgb_palette;
+    for (UBYTE i = mask; (i); i >>= 1, dest++) {
+        if ((i & 1) == 0) continue;
+        MemcpyBanked(dest, sour, sizeof(palette_entry_t), bank);
+        sour++;
+    }
+    DMG_palette[0] = ReadBankedUBYTE(palette->palette, bank);
+#ifdef SGB
+    if (_is_SGB) {
+        UBYTE sgb_palettes = SGB_PALETTES_NONE;
+        if (mask & 0b00110000) sgb_palettes |= SGB_PALETTES_01;
+        if (mask & 0b11000000) sgb_palettes |= SGB_PALETTES_23;
+        SGBTransferPalettes(sgb_palettes);
+    }
+#endif
+}
+
+void copy_scene_palette_colors(SCRIPT_CTX * THIS)OLDCALL BANKED {
+	uint8_t scene_bank = *(uint8_t *) VM_REF_TO_PTR(FN_ARG0);
+	const scene_t * scene_ptr = *(scene_t **) VM_REF_TO_PTR(FN_ARG1);
+	int16_t is_commit = *(int16_t*)VM_REF_TO_PTR(FN_ARG2);
+	
+	scene_t scn;
+    MemcpyBanked(&scn, scene_ptr, sizeof(scn), scene_bank);
+	load_bkg_palette(scn.palette.ptr, scn.palette.bank);
+	
+#ifdef CGB
+		if (is_commit && _is_CGB) {
+			set_bkg_palette(0, 8, (void *)(BkgPalette));
+		}
+#endif
+	
+}
