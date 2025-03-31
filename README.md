@@ -11,6 +11,9 @@ The value of each color is represented by a 15bit RGB value
 
 ![image](https://github.com/user-attachments/assets/f7b89f5a-2762-43d1-b5c0-dc93d9413abf)
 
+![image](https://github.com/user-attachments/assets/7e715edd-74ae-4643-a3f4-7641b267d8e8)
+
+
 The Copy scene palette colors will copy from another scene palette color data.
 Useful when using the submapping plugin and want to submap with the submapped scene color data.
 
