@@ -70,6 +70,53 @@ void set_palette_colors(SCRIPT_CTX * THIS) OLDCALL BANKED {
 	}
 }
 
+void get_palette_colors(SCRIPT_CTX * THIS) OLDCALL BANKED {
+	int16_t palettes = *(int16_t*)VM_REF_TO_PTR(FN_ARG0);
+	int16_t color0Var = *(int16_t*)VM_REF_TO_PTR(FN_ARG1);
+	int16_t color1Var = *(int16_t*)VM_REF_TO_PTR(FN_ARG2);
+	int16_t color2Var = *(int16_t*)VM_REF_TO_PTR(FN_ARG3);
+	int16_t color3Var = *(int16_t*)VM_REF_TO_PTR(FN_ARG4);
+	
+	UBYTE palette_from_idx = palettes & 7;
+	UBYTE is_sprite = (palettes >> 3) & 1;
+	UBYTE is_dmg = (palettes >> 4) & 1;
+	
+	if (is_dmg) {
+        switch (palette_from_idx & 1) {
+            case 0:
+                if (is_sprite) {
+					script_memory[color0Var] = ((DMG_palette[1] >> 2) & 3);
+					script_memory[color1Var] = ((DMG_palette[1] >> 4) & 3);
+					script_memory[color2Var] = ((DMG_palette[1] >> 6) & 3);
+                } else {
+					script_memory[color0Var] = ((DMG_palette[0]) & 3);
+					script_memory[color1Var] = ((DMG_palette[0] >> 2) & 3);
+					script_memory[color2Var] = ((DMG_palette[0] >> 4) & 3);
+					script_memory[color3Var] = ((DMG_palette[0] >> 6) & 3);
+				}
+                break;
+            case 1:
+                if (is_sprite) {
+					script_memory[color0Var] = ((DMG_palette[2] >> 2) & 3);
+					script_memory[color1Var] = ((DMG_palette[2] >> 4) & 3);
+					script_memory[color2Var] = ((DMG_palette[2] >> 6) & 3);
+                }
+                break;
+        }
+	} else {
+		if (is_sprite){			
+			script_memory[color0Var] = SprPalette[palette_from_idx].c1;
+			script_memory[color1Var] = SprPalette[palette_from_idx].c2;
+			script_memory[color2Var] = SprPalette[palette_from_idx].c3;
+		} else {
+			script_memory[color0Var] = BkgPalette[palette_from_idx].c0;
+			script_memory[color1Var] = BkgPalette[palette_from_idx].c1;
+			script_memory[color2Var] = BkgPalette[palette_from_idx].c2;
+			script_memory[color3Var] = BkgPalette[palette_from_idx].c3;
+		}
+	}
+}
+
 inline void load_bkg_palette(const palette_t * palette, UBYTE bank) {
 	palette_entry_t * dest = BkgPalette;
 	UBYTE mask = ReadBankedUBYTE(&palette->mask, bank);
