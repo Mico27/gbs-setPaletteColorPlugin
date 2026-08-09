@@ -236,3 +236,38 @@ the core compiles, move it independently of this plugin.
 
 </details>
 <!-- BANK0:END -->
+
+## Changelog
+
+Grouped by the date each change was merged into the official
+[gb-studio-plugins](https://github.com/gb-studio-dev/gb-studio-plugins) repository.
+
+Only bug fixes, new features and feature changes are listed. Engine version
+bumps, patch regeneration, packaging fixes and documentation edits are omitted.
+
+### 2026-06-14
+
+- Added custom script parameter / stack support to the events.
+
+### 2025-10-29
+
+- Fixed an unreferenced `DMG_PALETTE` and an inverted commit flag.
+
+### 2025-06-02
+
+- Fixed the palette update commit using `stackpush` instead of `stackpushconst`.
+
+### 2025-04-23
+
+- The palette index is now ignored for DMG background palettes.
+
+### 2025-04-02
+
+- Added a commit option to palette colour changes, and fixed an inverted parameter.
+- Fixed sprite colour changes.
+- Added an event to copy another scene's palette colour data.
+- Added a "get palette colour" event.
+
+### 2025-02-24
+
+- Initial release.
