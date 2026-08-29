@@ -1,10 +1,16 @@
 # gbs-setPaletteColorPlugin
 
-**Version 4.3.0 — Requires GB Studio ≥ 4.3.0**
+**Version 4.3.0. Requires GB Studio 4.3.0 or newer.**
 
-A GB Studio engine plugin that provides fine-grained runtime control over palette colours. Scripts can read and write individual colour slots for both background and sprite palettes on Game Boy Color, and the equivalent shade indices on original Game Boy hardware, all from script variables.
+Changes individual palette colours while the game runs, from script variables.
 
-It also adds extended versions of the standard Set Background/Sprite Palette events with a commit toggle, and a utility event that copies all background palette data from any other scene into the current palettes.
+That opens up effects GB Studio's palette events cannot reach: a lava glow that pulses, a sunset
+that shifts colour over a minute, a hit flash that turns one enemy white for three frames, a sky
+that darkens as a storm builds. Reading colours back means you can fade towards a target colour a
+step at a time.
+
+It also adds versions of the stock background and sprite palette events with a **Commit** tickbox,
+and an event that copies another scene's background palettes into the current one.
 
 ![image](https://github.com/user-attachments/assets/83791fcc-9e21-405f-a8fa-e40c9acb1203)
 
@@ -18,49 +24,55 @@ It also adds extended versions of the standard Set Background/Sprite Palette eve
 2. [Project Setup](#project-setup)
 3. [Size Limits and Restrictions](#size-limits-and-restrictions)
 4. [Events Reference](#events-reference)
-5. [Memory Footprint](#memory-footprint)
-6. [Bank 0 (HOME) Usage](#bank-0-home-usage)
-7. [Changelog](#changelog)
+5. [FAQ](#faq)
+6. [Memory Footprint](#memory-footprint)
+7. [Bank 0 (HOME) Usage](#bank-0-home-usage)
+8. [Changelog](#changelog)
 
 ---
 
 ## Concepts
 
-### Game Boy Color 15-bit RGB
+### How a colour is written on Game Boy Color
 
-On Game Boy Color, each colour is a 15-bit value: three channels of five bits each, in the range 0–31.
+Each colour is one number holding red, green and blue, each from 0 to 31:
 
 $$\text{colour} = R + (G \times 32) + (B \times 1024)$$
 
 | Channel | Range |
 |---|---|
-| Red | 0–31 |
-| Green | 0–31 |
-| Blue | 0–31 |
+| Red | 0 to 31 |
+| Green | 0 to 31 |
+| Blue | 0 to 31 |
 
-This is the format the colour events use when **Is gameboy color palette** is checked.
+Pure red is 31, pure green is 992, pure blue is 31744, and white is 32767. This is the format the
+events use with **Is gameboy color palette** ticked.
 
-### DMG shade indices
+### How a colour is written on original Game Boy
 
-On original Game Boy hardware, each palette entry is a 2-bit shade index instead of an RGB value:
+Each palette entry is a shade number rather than a colour:
 
 | Value | Shade |
 |---|---|
 | 0 | White |
-| 1 | Light grey / light green |
-| 2 | Dark grey / dark green |
+| 1 | Light |
+| 2 | Dark |
 | 3 | Black |
 
-The background palette has 4 shade slots. Each sprite palette has 3 usable shade slots, because colour 0 is always transparent.
+The background palette has 4 shades. A sprite palette has 3 usable ones, because the first is
+always transparent.
 
-### Commit vs. deferred
+### Commit
 
-Every palette-writing event in this plugin has a **Commit** checkbox:
+Every palette-writing event here has a **Commit** tickbox.
 
-- **Checked (default)** — the new colours are sent to the hardware immediately and are visible within the same frame.
-- **Unchecked** — the palettes are updated in memory but nothing is written to hardware. The change takes effect the next time hardware is updated, either by a later committed call or by the fade manager at the end of a fade-in.
+- **Ticked**, the default, sends the colours to the screen straight away and you see them this
+  frame.
+- **Unticked**, the colours are stored but not sent. They appear the next time something else
+  sends palettes, such as a later committed call or the end of a fade in.
 
-Uncheck **Commit** when changing palette colours during a fade-in, to avoid fighting the fade, or to batch several changes and push them all at once.
+Untick it when you are changing colours during a fade in, so your change and the fade do not fight,
+or when you want to set several palettes and show them all at once.
 
 ![image](https://github.com/user-attachments/assets/f7b89f5a-2762-43d1-b5c0-dc93d9413abf)
 
@@ -68,8 +80,8 @@ Uncheck **Commit** when changing palette colours during a fade-in, to avoid figh
 
 ## Project Setup
 
-1. Copy the plugin folder into your GB Studio project's `plugins/` directory.
-2. No additional configuration or engine fields are required — all five events become available immediately.
+1. Copy the plugin folder into your project's `plugins` folder.
+2. There is nothing to configure. All five events are available immediately.
 
 ![image](https://github.com/user-attachments/assets/7e715edd-74ae-4643-a3f4-7641b267d8e8)
 
@@ -79,122 +91,160 @@ Uncheck **Commit** when changing palette colours during a fade-in, to avoid figh
 
 ## Size Limits and Restrictions
 
-### Colour writing needs Game Boy Color
+### Full colours need Game Boy Color
 
-Reading and writing full RGB colours only applies to Game Boy Color palettes. On a DMG build, or with **Is gameboy color palette** unchecked, the events read and write DMG shade indices instead.
+Red, green and blue values apply to Game Boy Color palettes. On a monochrome build, or with **Is
+gameboy color palette** unticked, the events read and write shade numbers instead.
 
-### Sprite colour 0 is transparent and not writable
+### Sprite colour 0 is transparent
 
-For Game Boy Color sprite palettes, colour index 0 is the hardware transparency colour and cannot be set. **Set colors of a palette** therefore exposes only three colour fields for sprite palettes; the fourth is hidden.
+On Game Boy Color, the first colour of a sprite palette is always transparent and cannot be set.
+**Set colors of a palette** shows only three colour fields for a sprite palette.
 
-### Palette index range
+### Palette numbers
 
-| Mode | Palette index |
+| Mode | Palette number |
 |---|---|
-| Color background | 0–7 |
-| Color sprite | 0–7 |
-| DMG background | 0 (single palette) |
-| DMG sprite | 0–1 |
+| Color background | 0 to 7 |
+| Color sprite | 0 to 7 |
+| Monochrome background | 0, the only one |
+| Monochrome sprite | 0 or 1 |
 
-### Copy scene palette colors copies background only
+### Copy scene palette colors covers background only
 
-**Copy scene palette colors** reads background palette data from the target scene. It does not copy sprite palettes, and the source scene is chosen when the project is built.
+It reads the background palettes of the scene you name. Sprite palettes are untouched, and the
+source scene is chosen when the project is built.
 
-### The EX events use design-time palettes only
+### The EX events pick whole palettes
 
-**Set Background Palette EX** and **Set Sprite Palette EX** select palettes from the project's palette list; they cannot take runtime variables for individual colour channels. For dynamic colour control use **Set colors of a palette**.
+**Set Background Palette EX** and **Set Sprite Palette EX** choose palettes from your project's
+palette list. They cannot take a colour from a variable. For that, use **Set colors of a palette**.
 
-### No engine files modified
+### No engine files are replaced
 
-The plugin only adds a new engine source file, so it has no compatibility conflicts with other engine plugins.
+The plugin adds a new engine file and changes none of the existing ones, so it has no conflicts
+with other engine plugins.
 
 ---
 
 ## Events Reference
 
----
-
 ### Set colors of a palette
 
-**`EVENT_SET_PALETTE_COLORS`** — group: **Color**
+Group: **Color**.
 
-Sets the colour values of a single palette slot at runtime. Colours are 15-bit RGB values on Game Boy Color, or 2-bit shade indices on DMG.
+Sets the colours of one palette while the game runs.
 
 | Field | Default | Description |
 |---|---|---|
-| Is gameboy color palette | ✓ | When checked, colours are 15-bit Game Boy Color RGB values. When unchecked, they are DMG shade indices (0–3). |
-| Is sprite palette | ✗ | When checked, targets a sprite palette slot instead of a background one. |
-| Palette | 0 | Index of the palette slot to write. 0–7 for Color, 0 for DMG background, 0–1 for DMG sprites. |
-| Color 1 | 0 | First colour. For sprite palettes this is the first *visible* colour, since colour 0 is transparent. |
+| Is gameboy color palette | on | Ticked, the values are Game Boy Color colours. Unticked, they are shade numbers from 0 to 3. |
+| Is sprite palette | off | Ticked, targets a sprite palette instead of a background one. |
+| Palette | 0 | Which palette to write. 0 to 7 in colour, 0 for a monochrome background, 0 or 1 for monochrome sprites. |
+| Color 1 | 0 | First colour. On a sprite palette this is the first visible one, since the transparent slot cannot be set. |
 | Color 2 | 0 | Second colour. |
 | Color 3 | 0 | Third colour. |
-| Color 4 | 0 | Fourth colour. Background palettes only — hidden for sprite targets. |
-| Commit | ✓ | When checked, pushes the change to hardware immediately. Uncheck during fade-ins. |
-
----
+| Color 4 | 0 | Fourth colour. Background palettes only, hidden for sprites. |
+| Commit | on | Sends the change to the screen straight away. Untick it during fade ins. |
 
 ### Get colors of a palette
 
-**`EVENT_GET_PALETTE_COLORS`** — group: **Color**
+Group: **Color**.
 
-Reads the current colour values of a palette slot into script variables, in the same format as **Set colors of a palette**.
+Reads a palette's current colours into variables, in the same format as the event above.
 
 | Field | Default | Description |
 |---|---|---|
-| Is gameboy color palette | ✓ | When checked, reads 15-bit Game Boy Color values; otherwise DMG shade indices. |
-| Is sprite palette | ✗ | When checked, reads from a sprite palette slot. |
-| Palette | 0 | Index of the palette slot to read. |
-| Color 1 | — | Variable that receives the first colour. |
-| Color 2 | — | Variable that receives the second colour. |
-| Color 3 | — | Variable that receives the third colour. |
-| Color 4 | — | Variable that receives the fourth colour. Background palettes only. |
-
----
+| Is gameboy color palette | on | Ticked, reads Game Boy Color colours. Unticked, shade numbers. |
+| Is sprite palette | off | Ticked, reads a sprite palette. |
+| Palette | 0 | Which palette to read. |
+| Color 1 | none | Variable that receives the first colour. |
+| Color 2 | none | Variable that receives the second colour. |
+| Color 3 | none | Variable that receives the third colour. |
+| Color 4 | none | Variable that receives the fourth colour. Background palettes only. |
 
 ### Copy scene palette colors
 
-**`EVENT_COPY_BKG_COLORS_TO_BKG`** — group: **Screen**
+Group: **Screen**.
 
-Reads all 8 background palette entries from another scene and loads them into the current palettes, optionally committing them to hardware. Useful for applying another scene's background palette without a scene change — for example when using the SubmappingExPlugin to display tiles from another scene.
+Loads all 8 background palettes from another scene into the current ones. Handy when you are
+showing tiles from another scene, for instance with the SubmappingEx plugin, and want its colours
+too without changing scene.
 
 | Field | Default | Description |
 |---|---|---|
-| Scene | Last scene | The source scene whose background palette data is copied. Chosen when the project is built. |
-| Commit | ✓ | When checked, writes all 8 copied palette entries to hardware immediately. |
+| Scene | Last scene | The scene whose background palettes are copied. Chosen when the project is built. |
+| Commit | on | Sends all 8 palettes to the screen straight away. |
 
-Only background palettes are copied; sprite palettes are unaffected. On Super Game Boy hardware, SGB palette transfers are also triggered.
-
----
+Sprite palettes are left alone. On Super Game Boy the corresponding palette transfer also happens.
 
 ### Set Background Palette EX
 
-**`EVENT_PALETTE_SET_BACKGROUND_EX`** — group: **Color**
+Group: **Color**.
 
-The standard *Set Background Palette* event plus a **Commit** checkbox, so the palette write can be deferred — during a fade-in, for example.
+The stock **Set Background Palette** event with a **Commit** tickbox, so the change can be held
+back, for instance during a fade in.
 
 | Field | Default | Description |
 |---|---|---|
-| Palettes 0–7 | keep | The palette to apply to each of the 8 background palette slots. *keep* leaves the slot unchanged; *restore* resets it to the current scene's defined value. |
-| Commit | ✓ | When checked, pushes the palette to hardware immediately. Uncheck during fade-ins. |
-
----
+| Palettes 0 to 7 | keep | Which palette to put in each of the 8 background slots. **keep** leaves a slot as it is, **restore** puts back the scene's own value. |
+| Commit | on | Sends the change to the screen straight away. Untick it during fade ins. |
 
 ### Set Sprite Palette EX
 
-**`EVENT_PALETTE_SET_SPRITE_EX`** — group: **Color**
+Group: **Color**.
 
-The same as **Set Background Palette EX**, but targeting the 8 sprite palette slots.
+The same for the 8 sprite palette slots.
 
 | Field | Default | Description |
 |---|---|---|
-| Palettes 0–7 | keep | The palette to apply to each of the 8 sprite palette slots. *keep* leaves the slot unchanged; *restore* resets it to the scene's defined value. |
-| Commit | ✓ | When checked, pushes the palette to hardware immediately. Uncheck during fade-ins. |
+| Palettes 0 to 7 | keep | Which palette to put in each of the 8 sprite slots. **keep** leaves a slot as it is, **restore** puts back the scene's own value. |
+| Commit | on | Sends the change to the screen straight away. Untick it during fade ins. |
+
+---
+
+## FAQ
+
+**How do I make an enemy flash white when it takes a hit?**
+Read its sprite palette with **Get colors of a palette** and store the values, set all three colours
+to 32767 with **Set colors of a palette**, wait three frames, then write the stored values back.
+
+**How do I fade the sky from blue to orange over time?**
+Read the current colour, work out a value one step nearer the target, and write it back once a
+frame from an update script. Because the colour is a single number, you can step the red, green and
+blue parts separately with a little arithmetic.
+
+**How do I compute the number for a colour I want?**
+Multiply green by 32 and blue by 1024, then add red. Each part runs from 0 to 31, so mid grey is
+15 + 15×32 + 15×1024, which is 15855.
+
+**Can I do any of this on original Game Boy?**
+Yes, with shades rather than colours. Untick **Is gameboy color palette** and use 0 to 3. Swapping
+shades gives you a screen flash or an inverted look.
+
+**My colour change is wiped out at the start of a scene.**
+The fade in sends palettes when it finishes, overwriting anything committed during it. Untick
+**Commit** while the fade is running, or apply the change after it has completed.
+
+**Why can I only set three colours on a sprite palette?**
+The first slot of every sprite palette is transparent on the hardware and cannot be given a colour.
+
+**How do I change several palettes at once without seeing them arrive one at a time?**
+Untick **Commit** on all but the last call. Nothing is sent until the last one, and everything
+appears together.
+
+**Can I use another scene's colours without going to that scene?**
+Yes. **Copy scene palette colors** loads its 8 background palettes into the current ones.
+
+**Does it clash with other plugins?**
+No. It adds a new engine file and replaces none of the stock ones.
 
 ---
 
 ## Memory Footprint
 
-Measured against the stock GB Studio **4.3.0-e1** engine by `measure_plugin_memory.js` (per-file SDCC compile with GB Studio's own build flags, at default engine settings; report of 2026-08-13). Figures are this plugin's *delta* versus stock — a file that replaces a stock engine file counts only the difference, which is why a plugin can come out negative. Using the plugin's events additionally compiles a few bytes of GBVM script per call into your project's script banks, on top of the fixed cost below.
+Measured against the stock GB Studio **4.3.0-e1** engine at default engine settings, report of
+2026-08-13. Figures are the difference against a stock project. Each event you use also compiles a
+few bytes of script into your project, on top of the fixed cost below.
 
 | Budget | Cost |
 |---|---|
@@ -202,10 +252,13 @@ Measured against the stock GB Studio **4.3.0-e1** engine by `measure_plugin_memo
 | WRAM | 0 bytes |
 | Banked ROM | +1,341 bytes |
 
-- **Bank 0:** nothing. Every function the plugin adds is compiled into a switchable ROM bank.
-- **WRAM:** no change — the plugin works directly on the engine's existing palette buffers.
-- **Banked ROM:** 1,341 bytes for the colour manipulation helpers.
-- **Engine WRAM headroom:** a stock GB Studio 4.3.0 project leaves about **854 bytes** of WRAM free (usable engine WRAM is 7,776 bytes at 0xC0A0–0xDF00; the stock engine uses 6,922). With this plugin installed roughly **854 bytes** remain. That does not change with the number of global variables your project defines: the script memory array is a fixed 3,584 bytes at stock engine settings (VM_HEAP_SIZE + VM_MAX_CONTEXTS × VM_CONTEXT_STACK_SIZE = 768 + 16 × 64 words).
+- **Bank 0:** nothing. Everything the plugin adds is compiled into a switchable ROM bank.
+- **WRAM:** no change. The plugin works on the palette data GB Studio already keeps.
+- **Banked ROM:** 1,341 bytes for the colour code.
+- **Engine WRAM headroom:** a stock GB Studio 4.3.0 project leaves about **854 bytes** of WRAM
+  free (the engine has 7,776 bytes to work with and uses 6,922 of them). With this plugin
+  installed roughly **854 bytes** remain. Adding more global variables to your project does not
+  change that figure, because script memory is a fixed 3,584 byte block at stock engine settings.
 - **SRAM:** not used.
 
 ---
@@ -213,17 +266,16 @@ Measured against the stock GB Studio **4.3.0-e1** engine by `measure_plugin_memo
 <!-- BANK0:BEGIN -->
 ## Bank 0 (HOME) Usage
 
-Bank 0 is the 16 KB non-switchable ROM bank that the GB Studio engine core,
-the interrupt handlers and the GBDK runtime all share. Banked ROM is cheap
-(add another bank), bank 0 is not, so it is usually the first thing a project
-runs out of.
+Bank 0 is the 16 KB fixed ROM bank shared by the GB Studio engine core, the
+interrupt handlers and the GBDK runtime. Extra banked ROM is cheap to add,
+bank 0 is not, so bank 0 is usually the first thing a project runs out of.
 
 | | Bytes |
 |---|---|
 | Bank 0 used by this plugin | **0** |
 
-**This plugin costs nothing in bank 0.** Every one of its functions is compiled
-into a switchable ROM bank; nothing it adds is resident in bank 0.
+**This plugin costs nothing in bank 0.** Everything it adds is compiled into a
+switchable ROM bank.
 <!-- BANK0:END -->
 
 ## Changelog
@@ -231,31 +283,31 @@ into a switchable ROM bank; nothing it adds is resident in bank 0.
 Grouped by the date each change was merged into the official
 [gb-studio-plugins](https://github.com/gb-studio-dev/gb-studio-plugins) repository.
 
-Only bug fixes, new features and feature changes are listed. Engine version
-bumps, patch regeneration, packaging fixes and documentation edits are omitted.
+Only bug fixes, new features and feature changes are listed. Engine version bumps, patch
+regeneration, packaging fixes and documentation edits are omitted.
 
 ### 2026-06-14
 
-- Added custom script parameter / stack support to the events.
+- Added custom script parameter and stack support to the events.
 
 ### 2025-10-29
 
-- Fixed an unreferenced `DMG_PALETTE` and an inverted commit flag.
+- Fixed an unused monochrome palette setting and an inverted commit flag.
 
 ### 2025-06-02
 
-- Fixed the palette update commit using `stackpush` instead of `stackpushconst`.
+- Fixed the commit value being pushed the wrong way.
 
 ### 2025-04-23
 
-- The palette index is now ignored for DMG background palettes.
+- The palette number is now ignored for monochrome background palettes.
 
 ### 2025-04-02
 
-- Added a commit option to palette colour changes, and fixed an inverted parameter.
+- Added the commit option to palette colour changes, and fixed an inverted field.
 - Fixed sprite colour changes.
-- Added an event to copy another scene's palette colour data.
-- Added a "get palette colour" event.
+- Added the event that copies another scene's palette colours.
+- Added the event that reads a palette's colours.
 
 ### 2025-02-24
 
